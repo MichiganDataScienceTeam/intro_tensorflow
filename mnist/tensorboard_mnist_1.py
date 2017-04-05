@@ -12,7 +12,6 @@ from keras.metrics import *
 from keras.objectives import categorical_crossentropy
 
 
-
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 # save downloaded data to a directory named MNIST_data

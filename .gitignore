@@ -1,7 +1,7 @@
 # Created by .ignore support plugin (hsz.mobi)
 
 mnist/MNIST_data/
-mnist/logs/
+mnist/logs*/
 .idea/
 
 ### Python template

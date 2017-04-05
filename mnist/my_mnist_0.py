@@ -1,13 +1,14 @@
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 
-sess = tf.Session()
 from keras import backend as K
+sess = tf.Session()
 K.set_session(sess)
 
 from keras.layers import *
 from keras.metrics import *
 from keras.objectives import categorical_crossentropy
+
 
 # save downloaded data to a directory named MNIST_data
 mnist_data = input_data.read_data_sets('MNIST_data', one_hot=True)
