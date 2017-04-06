@@ -41,7 +41,6 @@ train_step = tf.train.GradientDescentOptimizer(0.5).minimize(loss)
 
 # initialize all variables
 log_path = os.path.join(PATH, 'logs')
-num_iter = 100
 batch_size = 50
 init_op = tf.global_variables_initializer()
 sess.run(init_op)
