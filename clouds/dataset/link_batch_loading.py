@@ -50,3 +50,35 @@ class RandomLinkLoader(BaseBatchMaker):
             'label': sequence[starting_loc+self.input_frame_length:starting_loc+clip_size],
         }
         return example
+
+
+class SampledRandomLinkLoader(BaseBatchMaker):
+    """
+    Clips are loaded as a continuous sequence of frames, split into:
+    [ input | labels ]
+    """
+
+    def __init__(self, input_frame_length, label_frame_length, sample_rate, *args, **kwargs):
+        super(SampledRandomLinkLoader, self).__init__(*args, **kwargs)
+        self.input_frame_length = input_frame_length
+        self.label_frame_length = label_frame_length
+        self.sample_rate = sample_rate
+
+    def get_example(self):
+        """
+
+        :return: example{}
+        ['train']: training frames
+        ['label']: label frames
+        """
+        sequence = self.sequence_getter.get_random_sequence()
+        clip_size = (self.input_frame_length + self.label_frame_length) * self.sample_rate
+        clip_starting_locs = np.arange(len(sequence) - clip_size)
+        starting_loc = np.random.choice(clip_starting_locs)
+
+        input_frame_end = starting_loc+self.input_frame_length*self.sample_rate
+        example = {
+            'train': sequence[starting_loc:input_frame_end:self.sample_rate],
+            'label': sequence[input_frame_end:starting_loc+clip_size:self.sample_rate],
+        }
+        return example

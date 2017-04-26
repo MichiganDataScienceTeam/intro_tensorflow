@@ -15,22 +15,26 @@ PATH = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == '__main__':
 
-    seq_root_dir = '/Users/anders/Movies/clouds'
-    shape_target = (100, 100)
-    batch_size = 5
-    input_frame_length = 4
+    seq_root_dir = '/Users/CyrusAnderson/Movies/clouds'
+    shape_target = (128, 128)
+    batch_size = 10
+    input_frame_length = 4  # 1 for 2D model
     label_frame_length = 1
     input_data = tf.placeholder(tf.float32, shape=(None, input_frame_length, *shape_target, 3))
     labels = tf.placeholder(tf.float32, shape=(None, label_frame_length, *shape_target, 3))
+    # input_data = tf.placeholder(tf.float32, shape=(None, *shape_target, 3), name='input_data')  # 2D model
+    # labels = tf.placeholder(tf.float32, shape=(None, *shape_target, 3), name='labels')
 
     sequence_locator = sequence_finder.NestedSequenceLocator()
     link_augmenter = link_augment.Augmenter()
     image_augmenter = image_augment.Augmenter(shape_target)
     link_batch_loader = link_batch_loading.RandomLinkLoader(
         input_frame_length, label_frame_length, sequence_locator, link_augmenter)
+    link_batch_loader = link_batch_loading.SampledRandomLinkLoader(
+        input_frame_length, label_frame_length, 10, sequence_locator, link_augmenter
+    )
     image_batch_loader = image_batch_loading.ImageLoader(image_augmenter)
     batch_assembler = batch_assembling.BatchAssembler()
-
     sequence_locator.load_sequences(seq_root_dir)
 
     def batch_generator():
@@ -41,20 +45,19 @@ if __name__ == '__main__':
             yield train, label
 
     data_generator = batch_generator()
-
     generator = prediction_training.Predictor()
-    loss = generator.loss(input_data, labels)
-    train_op = generator.train(loss)
     feedforward = generator.feedforward(input_data)
+    loss = generator.loss(feedforward, labels)
+    train_op = generator.train(loss)
 
     # summary setup
-    loss_summary = tf.summary.scalar('loss', loss)
+    loss_summary = tf.summary.scalar('loss_summary', tf.reduce_mean(loss))
     summary_op = tf.summary.merge_all()
 
     # save `batch size` images each epoch
     display_batch_size = 1
     display_img_trio = tf.placeholder(
-        tf.float32, shape=(display_batch_size, shape_target[0], 3*shape_target[1], 3))
+        tf.float32, shape=(display_batch_size, shape_target[0], 3*shape_target[1], 3), name='image_display')
 
     # initialize loggers
     log_path = os.path.join(PATH, 'logs2')
@@ -62,12 +65,17 @@ if __name__ == '__main__':
     valid_writer = tf.summary.FileWriter(log_path + '/valid')
     img_writer = tf.summary.FileWriter(log_path + '/images')
 
-    epochs = 20
-    samples_per_epoch = 100
+    epochs = 2000
+    samples_per_epoch = 40  # 100
     assert samples_per_epoch % batch_size == 0, \
             'batch size {} does not divide epoch size {}'.format(batch_size, samples_per_epoch)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
+
+        # for graph vis
+        graph_writer = tf.summary.FileWriter(log_path + '/graph', sess.graph)
+        graph_writer.add_graph(sess.graph)
+        graph_writer.close()
 
         epoch = 0
         sampled = 0
@@ -77,9 +85,11 @@ if __name__ == '__main__':
             while sampled < samples_per_epoch:
 
                 train_data_batch, label_batch = data_generator.__next__()
-                summary, _ = sess.run([summary_op, train_op], feed_dict={
-                    input_data: train_data_batch,
-                    labels: label_batch,
+                print(train_data_batch[:, 0:1, :, :, :].shape)
+
+                summary, loss_val, _ = sess.run([summary_op, loss, train_op], feed_dict={
+                    input_data: train_data_batch,  # [:, 0, :, :, :], for 2D model
+                    labels: label_batch,  # [:, 0, :, :, :],
                     K.learning_phase(): 1,
                 })
                 train_writer.add_summary(summary, epoch*samples_per_epoch + sampled)
@@ -90,16 +100,28 @@ if __name__ == '__main__':
             # save images per epoch as: input | prediction | groundtruth
             display_img_summary = tf.summary.image(
                 'Epoch {:03d}'.format(epoch), display_img_trio, max_outputs=display_batch_size)
-            generated = sess.run(feedforward, feed_dict={
-                input_data: np.expand_dims(train_data_batch[0, ...], axis=0),
-                K.learning_phase(): 1,
+            generated, loss_val = sess.run([feedforward, loss], feed_dict={
+                input_data: train_data_batch[0:1, ...],  # [0:1, 0, :, :, :],
+                labels: label_batch[0:1, ...],  # [0:1, 0, :, :, :],
+                K.learning_phase(): 0,
             })
-            pred_array = np.vstack([p[np.newaxis, :] for p in generated])
+            pred_array = np.vstack([p[np.newaxis, ...] for p in generated])
+            pred_array = np.clip(pred_array, 0, 1)
+
             display_trio = np.concatenate((
                 np.expand_dims(train_data_batch[0, 0, ...], axis=0),
                 np.expand_dims(pred_array[0, 0, ...], axis=0),
                 np.expand_dims(label_batch[0, 0, ...], axis=0)
             ), axis=2)
+            # 2D model
+            # display_trio = np.concatenate((
+            #     np.expand_dims(train_data_batch[0, ...], axis=0),
+            #     np.expand_dims(pred_array[0, ...], axis=0),
+            #     np.expand_dims(label_batch[0, ...], axis=0),
+            # ), axis=2)
+            display_trio = (display_trio*255).astype(np.uint8)
 
             img_summary = sess.run([display_img_summary], feed_dict={display_img_trio: display_trio})[0]
             img_writer.add_summary(img_summary, epoch*samples_per_epoch)
+
+
