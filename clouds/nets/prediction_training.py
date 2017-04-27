@@ -23,5 +23,3 @@ class Predictor(training.Trainer):
     def train(self, loss):
         g_opt = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=self.beta1, epsilon=.01)
         return g_opt.minimize(loss, var_list=self.g.variables)
-        # g_opt_op = g_opt.minimize(loss, var_list=self.g.variables)  # errors
-        # return g_opt_op

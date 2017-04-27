@@ -31,7 +31,7 @@ if __name__ == '__main__':
     link_batch_loader = link_batch_loading.RandomLinkLoader(
         input_frame_length, label_frame_length, sequence_locator, link_augmenter)
     link_batch_loader = link_batch_loading.SampledRandomLinkLoader(
-        input_frame_length, label_frame_length, 10, sequence_locator, link_augmenter
+        input_frame_length, label_frame_length, 30, sequence_locator, link_augmenter
     )
     image_batch_loader = image_batch_loading.ImageLoader(image_augmenter)
     batch_assembler = batch_assembling.BatchAssembler()
